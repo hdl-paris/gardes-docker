@@ -1,0 +1,58 @@
+version: '2'
+services:
+  db:
+    build: ./mysql
+    environment:
+        MYSQL_ROOT_PASSWORD: password
+    volumes:
+      - ./database_initial:/docker-entrypoint-initdb.d:Z
+      - ${DOCKER_GARDES_MYSQL_VOLUME}:/var/lib/mysql:Z
+      - ./mysql/rebuild.sh:/var/dbs/rebuild.sh:Z
+      - ./dumps/sosgardes_last.sql:/var/dbs/sosgardes_last.sql:Z
+    ports:
+      - 3306:3306
+    container_name: gardes_mysql
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+     - PMA_ARBITRARY=1
+     - PMA_PORT=3306
+     - PMA_USER=root
+     - PMA_PASSWORD=password
+     - PMA_HOST=db
+    restart: always
+    ports:
+     - 8080:80
+    volumes:
+     - /sessions
+    links:
+     - db
+  web:
+    build: .
+    container_name: gardes
+    ports:
+     - "80:80"
+     - "443:443"
+    volumes:
+     # Apache related volumes
+     - ./apache/gardes.conf:/etc/apache2/sites-enabled/000-default.conf:Z
+     - ./logs/apache:/var/app/logs:Z
+
+     # PHP related volumes
+     - ./php/php.ini:/usr/local/etc/php/php.ini:Z
+
+     # General code volume
+     - ./gardes:/var/www/html:Z
+
+     # Specific archives volumes
+     - ./files/dbconnect.php:/var/www/html/dbconnect.php:Z
+
+#    env_file:
+#      - web-variables.env
+    links:
+     - db
+     - mail
+  mail:
+    container_name: gardes-smtp-server
+    image: namshi/smtp
